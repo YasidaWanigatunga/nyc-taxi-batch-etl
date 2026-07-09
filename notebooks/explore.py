@@ -20,3 +20,8 @@ for col in ["VendorID", "RatecodeID", "payment_type"]:
     print(df[col].value_counts(dropna=False).head(10))
 print("\n--- DATE RANGE ---")
 print(df["tpep_pickup_datetime"].min(), "→", df["tpep_pickup_datetime"].max())
+
+flex = df[df["payment_type"] == 0]
+print("payment_type=0 rows:", len(flex))
+print("null passenger_count but payment_type != 0:",
+      len(df[df["passenger_count"].isna() & (df["payment_type"] != 0)]))
