@@ -1,0 +1,3 @@
+-r requirements-airflow.txt
+-r requirements-dashboard.txt
+pytest==8.2.0

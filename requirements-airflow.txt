@@ -1,0 +1,5 @@
+# Pinned against apache/airflow:2.9.3-python3.10
+pandas==2.1.4
+pyarrow==15.0.2
+psycopg2-binary==2.9.9
+requests==2.32.3
