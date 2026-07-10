@@ -1,23 +1,23 @@
 from __future__ import annotations
-
 import io
 from contextlib import contextmanager
-
 import pandas as pd
 import psycopg2
 from psycopg2 import sql
-
 from .config import DW_DSN, LOAD_CHUNK_SIZE
+from .logging_utils import get_logger
 
+logger = get_logger(__name__)
 
 @contextmanager
 def get_connection():
+    """Yield a connection whose transaction commits on success, rolls back on error."""
     conn = psycopg2.connect(DW_DSN)
     try:
-        with conn:            # commits on clean exit, ROLLS BACK on exception
+        with conn:# psycopg2 overloads __exit__ to COMMIT / ROLLBACK
             yield conn
     finally:
-        conn.close()
+        conn.close()# __exit__ does not close the socket; we must
 
 
 def _copy_frame(cursor, frame: pd.DataFrame, table: str) -> int:
@@ -26,6 +26,7 @@ def _copy_frame(cursor, frame: pd.DataFrame, table: str) -> int:
     frame.to_csv(buffer, index=False, header=False, na_rep="\\N")
     buffer.seek(0)
 
+    # sql.Identifier quotes/escapes column names — never f-string them.
     statement = sql.SQL("COPY {} ({}) FROM STDIN WITH (FORMAT csv, NULL '\\N')").format(
         sql.SQL(table),
         sql.SQL(", ").join(sql.Identifier(c) for c in frame.columns),
@@ -47,12 +48,21 @@ def upsert_dimension(frame: pd.DataFrame, table: str, key_column: str) -> int:
             SELECT {", ".join(frame.columns)} FROM stage_dim
             ON CONFLICT ({key_column}) DO UPDATE SET {update_clause};
         """)
-    print(f"upserted {len(frame):,} rows into {table}")
+
+    logger.info(
+        "dimension upserted",
+        extra={"context": {"table": table, "rows": len(frame)}},
+    )
     return len(frame)
 
 
 def load_fact_month(fact: pd.DataFrame, month: str) -> int:
-    """Idempotent month reload: delete that month's rows, then COPY."""
+    """Idempotent month reload: delete that month's rows, then COPY the new ones.
+
+    Correct only because transform.clean_trips() guarantees every row's pickup
+    timestamp falls inside `month`. The DELETE therefore removes exactly and
+    completely the previous load of that month.
+    """
     start_key = int(pd.Timestamp(f"{month}-01").strftime("%Y%m%d"))
     end_key = int(
         (pd.Timestamp(f"{month}-01") + pd.offsets.MonthBegin(1)).strftime("%Y%m%d")
@@ -65,13 +75,24 @@ def load_fact_month(fact: pd.DataFrame, month: str) -> int:
             "WHERE pickup_date_key >= %s AND pickup_date_key < %s;",
             (start_key, end_key),
         )
-        print(f"cleared {cur.rowcount:,} existing rows for {month}")
+        logger.info(
+            "fact month cleared (idempotency)",
+            extra={"context": {"month": month, "rows_deleted": cur.rowcount}},
+        )
 
         for offset in range(0, len(fact), LOAD_CHUNK_SIZE):
             chunk = fact.iloc[offset:offset + LOAD_CHUNK_SIZE]
             loaded += _copy_frame(cur, chunk, "taxi.fact_taxi_trips")
-            print(f"  loaded {loaded:,} / {len(fact):,}")
-
+            logger.info(
+                "fact chunk loaded",
+                extra={"context": {"month": month,
+                                   "rows_loaded_so_far": loaded,
+                                   "rows_total": len(fact)}},
+            )
+    logger.info(
+        "fact month loaded",
+        extra={"context": {"month": month, "rows_loaded": loaded}},
+    )
     return loaded
 
 
@@ -95,6 +116,8 @@ def run_quality_checks() -> dict:
         for name, query in checks.items():
             cur.execute(query)
             results[name] = cur.fetchone()[0]
+
+    logger.info("data quality results", extra={"context": results})
 
     if results["fact_row_count"] == 0:
         raise ValueError("Quality check failed: fact table is empty.")
