@@ -1,26 +1,25 @@
+from __future__ import annotations
 from pathlib import Path
 import requests
-
 from .config import RAW_DATA_DIR, TRIP_DATA_URL, ZONE_LOOKUP_URL
 
-CHUNK = 1024 * 1024
+CHUNK_BYTES = 1024 * 1024  # 1 MiB
 
 
 def _download(url: str, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
 
     if destination.exists() and destination.stat().st_size > 0:
-        print(f"skip (exists): {destination.name}")
+        print(f"skip (cached): {destination.name}")
         return destination
 
     tmp = destination.with_suffix(destination.suffix + ".part")
     with requests.get(url, stream=True, timeout=120) as resp:
-        resp.raise_for_status()
+        resp.raise_for_status()          # a 404 must not become a "parquet" file
         with tmp.open("wb") as fh:
-            for chunk in resp.iter_content(chunk_size=CHUNK):
+            for chunk in resp.iter_content(chunk_size=CHUNK_BYTES):
                 fh.write(chunk)
-    tmp.rename(destination)
-
+    tmp.rename(destination)               
     print(f"downloaded: {destination.name} ({destination.stat().st_size:,} bytes)")
     return destination
 

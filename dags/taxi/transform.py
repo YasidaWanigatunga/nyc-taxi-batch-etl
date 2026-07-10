@@ -1,5 +1,5 @@
+from __future__ import annotations
 import pandas as pd
-
 from .config import (
     MAX_PASSENGERS, MAX_TRIP_DISTANCE, MAX_TRIP_DURATION,
     MIN_TOTAL_AMOUNT, MIN_TRIP_DISTANCE, MIN_TRIP_DURATION,
@@ -17,10 +17,19 @@ RAW_COLUMNS = [
 DAY_PARTS = [(0, 6, "Night"), (6, 12, "Morning"), (12, 17, "Afternoon"),
              (17, 21, "Evening"), (21, 24, "Night")]
 
+MIN_LOCATION_ID = 1
+MAX_LOCATION_ID = 265
+
 
 def clean_trips(parquet_path: str, month: str) -> tuple[pd.DataFrame, dict]:
+    """Return (fact_dataframe, quality_metrics) for one month of trips."""
+    # Reading only the 14 columns we need is the cheapest optimisation here.
     df = pd.read_parquet(parquet_path, columns=RAW_COLUMNS)
     rows_extracted = len(df)
+
+    # Deduplicate (exact full-row only; see findings: no natural key) 
+    df = df.drop_duplicates()
+    rows_duplicate = rows_extracted - len(df)
 
     df = df.rename(columns={
         "VendorID": "vendor_key",
@@ -35,9 +44,13 @@ def clean_trips(parquet_path: str, month: str) -> tuple[pd.DataFrame, dict]:
 
     df["pickup_ts"] = pd.to_datetime(df["pickup_ts"], errors="coerce")
     df["dropoff_ts"] = pd.to_datetime(df["dropoff_ts"], errors="coerce")
-    df["trip_duration_min"] = (df["dropoff_ts"] - df["pickup_ts"]).dt.total_seconds() / 60.0
 
-    # --- Conform: fill and map unknowns (findings #1, #6, #7) ---
+    # Derived measure computed BEFORE filtering — the duration filter needs it.
+    df["trip_duration_min"] = (
+        (df["dropoff_ts"] - df["pickup_ts"]).dt.total_seconds() / 60.0
+    )
+
+    # CONFORM: the event is real, the measure is missing (findings 1,6,7)
     df["passenger_count"] = df["passenger_count"].fillna(1).astype("int16")
     df["congestion_surcharge"] = df["congestion_surcharge"].fillna(0.0)
 
@@ -49,7 +62,7 @@ def clean_trips(parquet_path: str, month: str) -> tuple[pd.DataFrame, dict]:
         df[col] = df[col].fillna(unknown).astype("int16")
         df.loc[~df[col].isin(valid.keys()), col] = unknown
 
-    # --- Reject: impossible rows (findings #2, #3, #4, #8) ---
+    # REJECT: the event itself is invalid (findings 2,3,4,8)
     month_start = pd.Timestamp(f"{month}-01")
     month_end = month_start + pd.offsets.MonthBegin(1)
 
@@ -63,16 +76,17 @@ def clean_trips(parquet_path: str, month: str) -> tuple[pd.DataFrame, dict]:
         & (df["tip_amount"] >= 0)
         & (df["tolls_amount"] >= 0)
         & (df["total_amount"] >= MIN_TOTAL_AMOUNT)
-        & df["pu_location_key"].between(1, 265)
-        & df["do_location_key"].between(1, 265)
+        & df["pu_location_key"].between(MIN_LOCATION_ID, MAX_LOCATION_ID)
+        & df["do_location_key"].between(MIN_LOCATION_ID, MAX_LOCATION_ID)
     )
-    rejected = int((~keep).sum())
+    rows_rejected = int((~keep).sum())
     df = df.loc[keep].copy()
 
-    # --- Conform to the star schema ---
     df["pickup_date_key"] = df["pickup_ts"].dt.strftime("%Y%m%d").astype("int32")
     df["dropoff_date_key"] = df["dropoff_ts"].dt.strftime("%Y%m%d").astype("int32")
     df["pickup_time_key"] = df["pickup_ts"].dt.hour.astype("int16")
+    df["pu_location_key"] = df["pu_location_key"].astype("int16")
+    df["do_location_key"] = df["do_location_key"].astype("int16")
 
     fact_columns = [
         "pickup_date_key", "pickup_time_key", "dropoff_date_key",
@@ -83,18 +97,26 @@ def clean_trips(parquet_path: str, month: str) -> tuple[pd.DataFrame, dict]:
         "fare_amount", "tip_amount", "tolls_amount",
         "congestion_surcharge", "total_amount",
     ]
-    fact = df[fact_columns].round(2)
+    fact = df[fact_columns].round({
+        "trip_distance_miles": 2, "trip_duration_min": 2,
+        "fare_amount": 2, "tip_amount": 2, "tolls_amount": 2,
+        "congestion_surcharge": 2, "total_amount": 2,
+    })
 
     metrics = {
         "month": month,
         "rows_extracted": rows_extracted,
-        "rows_rejected": rejected,
+        "rows_duplicate": rows_duplicate,
+        "rows_rejected": rows_rejected,
         "rows_clean": len(fact),
-        "reject_rate_pct": round(100 * rejected / max(rows_extracted, 1), 3),
+        "reject_rate_pct": round(100 * rows_rejected / max(rows_extracted, 1), 3),
     }
     return fact, metrics
 
+
+# Dimension builders
 def build_dim_date(start: str, end: str) -> pd.DataFrame:
+    """start/end are 'YYYY-MM-DD', inclusive."""
     dates = pd.date_range(start, end, freq="D")
     return pd.DataFrame({
         "date_key": dates.strftime("%Y%m%d").astype(int),
@@ -127,22 +149,34 @@ def build_dim_time() -> pd.DataFrame:
 
 def build_dim_location(zone_csv_path: str) -> pd.DataFrame:
     df = pd.read_csv(zone_csv_path).rename(columns={
-        "LocationID": "location_key", "Borough": "borough", "Zone": "zone_name",
+        "LocationID": "location_key",
+        "Borough": "borough",
+        "Zone": "zone_name",
     })
     for col in ("borough", "zone_name", "service_zone"):
         df[col] = df[col].fillna("Unknown")
-    return df[["location_key", "borough", "zone_name", "service_zone"]].drop_duplicates("location_key")
+    return (
+        df[["location_key", "borough", "zone_name", "service_zone"]]
+        .drop_duplicates("location_key")
+        .astype({"location_key": "int16"})
+    )
 
 
-def _kv_dim(mapping, key_col, val_col):
-    return pd.DataFrame([{key_col: k, val_col: v} for k, v in mapping.items()]).sort_values(key_col)
+def _kv_dim(mapping: dict, key_col: str, val_col: str) -> pd.DataFrame:
+    return (
+        pd.DataFrame([{key_col: k, val_col: v} for k, v in mapping.items()])
+        .sort_values(key_col)
+        .astype({key_col: "int16"})
+    )
 
 
-def build_dim_vendor():
+def build_dim_vendor() -> pd.DataFrame:
     return _kv_dim(VENDORS, "vendor_key", "vendor_name")
 
-def build_dim_payment_type():
+
+def build_dim_payment_type() -> pd.DataFrame:
     return _kv_dim(PAYMENT_TYPES, "payment_type_key", "payment_desc")
 
-def build_dim_rate_code():
+
+def build_dim_rate_code() -> pd.DataFrame:
     return _kv_dim(RATE_CODES, "rate_code_key", "rate_code_desc")
