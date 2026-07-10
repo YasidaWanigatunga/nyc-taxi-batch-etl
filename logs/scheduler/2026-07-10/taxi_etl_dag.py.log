@@ -1557,3 +1557,4 @@ Please take a look at these docs to improve your DAG import time:
 [2026-07-10T11:57:54.683+0000] {processor.py:161} INFO - Started process (PID=247) to work on /opt/airflow/dags/taxi_etl_dag.py
 [2026-07-10T11:57:54.694+0000] {processor.py:830} INFO - Processing file /opt/airflow/dags/taxi_etl_dag.py for tasks to queue
 [2026-07-10T11:57:54.764+0000] {logging_mixin.py:188} INFO - [2026-07-10T11:57:54.712+0000] {dagbag.py:545} INFO - Filling up the DagBag from /opt/airflow/dags/taxi_etl_dag.py
+[2026-07-10T11:57:57.840+0000] {processor.py:840} INFO - DAG(s) 'nyc_taxi_batch_etl' retrieved from /opt/airflow/dags/taxi_etl_dag.py
