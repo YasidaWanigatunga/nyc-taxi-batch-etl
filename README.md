@@ -14,17 +14,127 @@ metrics through a Streamlit dashboard. Orchestrated with Apache Airflow.
 | Infra | Docker Compose |
 
 ## Quick start
+
+Requires Docker Desktop (≥ 6 GB RAM), `curl`, `python3`, and `git`.
+On Windows 11, run everything inside WSL2 with Docker Desktop's WSL
+integration enabled — see [Windows notes](#windows-11--wsl2) below.
+
 ```bash
-git clone <repo> && cd nyc-taxi-batch-etl
-chmod +x setup.sh && ./setup.sh
+git clone https://github.com/YasidaWanigatunga/nyc-taxi-batch-etl.git
+cd nyc-taxi-batch-etl
+chmod +x setup.sh
+./setup.sh
 ```
-Then: Airflow http://localhost:8080 (admin/admin) → un-pause
-`nyc_taxi_batch_etl` → ▶ Trigger. Then Streamlit http://localhost:8501.
+
+`setup.sh` verifies the toolchain, writes `.env` with your host `AIRFLOW_UID`,
+creates `.venv` and installs dependencies, `curl`s two months of trip data plus
+the taxi-zone lookup into `data/raw/`, then brings up the full stack and waits
+for health checks. It is idempotent — existing downloads are skipped.
+
+| Service | URL | Credentials |
+|---|---|---|
+| Airflow | http://localhost:8080 | `admin` / `admin` |
+| Streamlit | http://localhost:8501 | — |
+| PostgreSQL | `localhost:5432` | db `taxi_dw`, user `taxi`, pw `taxi` |
+
+### Load the data
+
+The warehouse starts empty. In Airflow:
+
+1. Un-pause **`nyc_taxi_batch_etl`** (toggle, left of the DAG name)
+2. Click **▶ Trigger DAG**
+3. Watch the **Graph** tab with **Auto-refresh** on
+
+Roughly 20 minutes for both months (~5.8M trips). Or from the CLI:
+
+```bash
+docker compose exec airflow-scheduler airflow dags unpause nyc_taxi_batch_etl
+docker compose exec airflow-scheduler airflow dags trigger nyc_taxi_batch_etl
+```
+
+Verify:
+
+```bash
+docker compose exec postgres psql -U taxi -d taxi_dw \
+  -c "SELECT COUNT(*) FROM taxi.fact_taxi_trips;"
+```
+
+Expect `5838956`. Then refresh http://localhost:8501 — the dashboard populates.
+
+### Running the business queries
+
+```bash
+docker compose exec -T postgres psql -U taxi -d taxi_dw < sql/analytics_queries.sql
+```
+
+### Everyday commands
+
+```bash
+docker compose ps                          # container health
+docker compose logs -f airflow-scheduler   # follow structured JSON logs
+docker compose exec postgres psql -U taxi -d taxi_dw   # SQL shell
+docker compose down                        # stop, keep the data
+docker compose down -v                     # stop and DESTROY the data volume
+docker compose up -d                       # start again (no rebuild)
+```
 
 ## Windows 11 / WSL2
-Run inside WSL2 with Docker Desktop WSL integration enabled. Clone into
-`~/projects/`, **not** `/mnt/c/` — bind-mounts across the Windows boundary
-are 10–20x slower. Give Docker ≥ 6 GB RAM.
+
+```powershell
+wsl --install -d Ubuntu    # PowerShell as Administrator, then reboot
+```
+
+1. Install Docker Desktop → Settings → Resources → **WSL Integration** → enable Ubuntu
+2. Settings → Resources → **Memory: 6 GB minimum** (Airflow + Postgres + a 3M-row
+   pandas DataFrame will OOM at 4 GB)
+3. `sudo apt install -y python3-venv curl git`
+4. Clone into `~/projects/`, **not** `/mnt/c/`. Bind-mounts across the
+   Windows↔Linux boundary go through a translation layer and run 10–20× slower;
+   reading a 50 MB parquet file goes from seconds to minutes.
+5. `./setup.sh`
+
+## Evidence
+
+### Airflow DAG — successful run
+![DAG graph](docs/01-dag-graph-success.png)
+
+`download_month [2]` and `process_month [2]` show **dynamic task mapping**: one
+task instance per month, created at runtime from `get_months()`. Each month
+retries independently. `build_dimensions` is a TaskGroup; the edge from it to
+`process_month` is an ordering constraint with no data dependency — the fact
+table's foreign keys require the dimensions to exist first.
+
+### Streamlit dashboard
+![Dashboard](docs/02-dashboard.png)
+
+5,838,956 trips · $159,334,377 revenue · $5.45 average fare per mile.
+Note **"Flex Fare trip"** in the payment-type chart: 71,743 rows per month with
+`payment_type = 0`, undocumented in the TLC data dictionary. Conformed rather
+than dropped — they carry $3.9M, ~2.5% of total revenue.
+
+### Failure alerting (Task 4)
+![Failure alert](docs/03-failure-alert.png)
+
+`on_failure_callback` fired after the final retry (`try_number: 4`), emitting a
+structured ERROR log with `dag_id`, `task_id`, `run_id`, `log_url`, and the
+exception. Verified by temporarily adding a task that raises, then removing it.
+
+Airflow's **"Mark as Failed" does *not* trigger callbacks** — it writes metadata
+state without executing the task. Tested, not assumed.
+
+### Idempotency
+![Idempotent reload](docs/04-idempotency.png)
+
+`rows_deleted: 5,986,738` — exactly two copies of January's 2,993,369 rows.
+An earlier run had duplicated the month (I triggered the DAG and the standalone
+runner concurrently: two writers, one table). Re-running the load deleted the
+entire January key range and re-inserted a single clean copy, restoring the
+correct total of 5,838,956.
+
+Delete-then-COPY is therefore not merely safe to retry — it is **self-repairing**.
+It is atomic per transaction, not across processes. Airflow prevents concurrent
+writers in practice (`max_active_runs=1`, no concurrent instances of a task), but
+a hardened version would take a Postgres advisory lock keyed on the month.
 
 ## Star schema
 **Grain: one row per completed taxi trip.**

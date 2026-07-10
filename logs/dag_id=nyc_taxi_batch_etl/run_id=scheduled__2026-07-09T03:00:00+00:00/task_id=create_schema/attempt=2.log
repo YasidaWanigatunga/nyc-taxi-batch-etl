@@ -15,3 +15,20 @@
 [2026-07-10T10:42:56.106+0000] {local_task_job_runner.py:243} INFO - Task exited with return code 0
 [2026-07-10T10:42:56.176+0000] {taskinstance.py:3503} INFO - 1 downstream tasks scheduled from follow-on schedule check
 [2026-07-10T10:42:56.178+0000] {local_task_job_runner.py:222} INFO - ::endgroup::
+[2026-07-10T14:27:36.298+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-07-10T14:27:36.433+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.create_schema scheduled__2026-07-09T03:00:00+00:00 [queued]>
+[2026-07-10T14:27:36.446+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.create_schema scheduled__2026-07-09T03:00:00+00:00 [queued]>
+[2026-07-10T14:27:36.446+0000] {taskinstance.py:2306} INFO - Starting attempt 2 of 3
+[2026-07-10T14:27:36.465+0000] {taskinstance.py:2330} INFO - Executing <Task(_PythonDecoratedOperator): create_schema> on 2026-07-09 03:00:00+00:00
+[2026-07-10T14:27:36.472+0000] {standard_task_runner.py:64} INFO - Started process 413 to run task
+[2026-07-10T14:27:36.475+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'nyc_taxi_batch_etl', 'create_schema', 'scheduled__2026-07-09T03:00:00+00:00', '--job-id', '14', '--raw', '--subdir', 'DAGS_FOLDER/taxi_etl_dag.py', '--cfg-path', '/tmp/tmpfjgeilv9']
+[2026-07-10T14:27:36.476+0000] {standard_task_runner.py:91} INFO - Job 14: Subtask create_schema
+[2026-07-10T14:27:36.547+0000] {task_command.py:426} INFO - Running <TaskInstance: nyc_taxi_batch_etl.create_schema scheduled__2026-07-09T03:00:00+00:00 [running]> on host 03a8c9f72f2e
+[2026-07-10T14:27:36.726+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='data-engineering' AIRFLOW_CTX_DAG_ID='nyc_taxi_batch_etl' AIRFLOW_CTX_TASK_ID='create_schema' AIRFLOW_CTX_EXECUTION_DATE='2026-07-09T03:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='2' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2026-07-09T03:00:00+00:00'
+[2026-07-10T14:27:36.727+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-07-10T14:27:52.555+0000] {python.py:237} INFO - Done. Returned value was: schema_ready
+[2026-07-10T14:27:52.555+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-07-10T14:27:52.590+0000] {taskinstance.py:1206} INFO - Marking task as SUCCESS. dag_id=nyc_taxi_batch_etl, task_id=create_schema, run_id=scheduled__2026-07-09T03:00:00+00:00, execution_date=20260709T030000, start_date=20260710T142736, end_date=20260710T142752
+[2026-07-10T14:27:52.695+0000] {local_task_job_runner.py:243} INFO - Task exited with return code 0
+[2026-07-10T14:27:52.743+0000] {taskinstance.py:3503} INFO - 1 downstream tasks scheduled from follow-on schedule check
+[2026-07-10T14:27:52.746+0000] {local_task_job_runner.py:222} INFO - ::endgroup::

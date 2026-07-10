@@ -15,3 +15,20 @@
 [2026-07-10T10:12:59.951+0000] {local_task_job_runner.py:243} INFO - Task exited with return code 0
 [2026-07-10T10:12:59.980+0000] {taskinstance.py:3503} INFO - 0 downstream tasks scheduled from follow-on schedule check
 [2026-07-10T10:13:00.110+0000] {local_task_job_runner.py:222} INFO - ::endgroup::
+[2026-07-10T14:42:21.567+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-07-10T14:42:21.676+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.quality_check scheduled__2026-07-09T03:00:00+00:00 [queued]>
+[2026-07-10T14:42:21.689+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.quality_check scheduled__2026-07-09T03:00:00+00:00 [queued]>
+[2026-07-10T14:42:21.689+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 3
+[2026-07-10T14:42:21.710+0000] {taskinstance.py:2330} INFO - Executing <Task(_PythonDecoratedOperator): quality_check> on 2026-07-09 03:00:00+00:00
+[2026-07-10T14:42:21.717+0000] {standard_task_runner.py:64} INFO - Started process 629 to run task
+[2026-07-10T14:42:21.722+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'nyc_taxi_batch_etl', 'quality_check', 'scheduled__2026-07-09T03:00:00+00:00', '--job-id', '22', '--raw', '--subdir', 'DAGS_FOLDER/taxi_etl_dag.py', '--cfg-path', '/tmp/tmpoax4hbk5']
+[2026-07-10T14:42:21.723+0000] {standard_task_runner.py:91} INFO - Job 22: Subtask quality_check
+[2026-07-10T14:42:21.811+0000] {task_command.py:426} INFO - Running <TaskInstance: nyc_taxi_batch_etl.quality_check scheduled__2026-07-09T03:00:00+00:00 [running]> on host 03a8c9f72f2e
+[2026-07-10T14:42:21.999+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='data-engineering' AIRFLOW_CTX_DAG_ID='nyc_taxi_batch_etl' AIRFLOW_CTX_TASK_ID='quality_check' AIRFLOW_CTX_EXECUTION_DATE='2026-07-09T03:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2026-07-09T03:00:00+00:00'
+[2026-07-10T14:42:22.001+0000] {taskinstance.py:430} INFO - ::endgroup::
+[2026-07-10T14:43:21.546+0000] {python.py:237} INFO - Done. Returned value was: {'fact_row_count': 5838956, 'orphan_location_fks': 0, 'negative_totals': 0, 'null_date_keys': 0, 'months_processed': 2, 'total_rows_loaded': 5838956, 'total_rows_rejected': 141765}
+[2026-07-10T14:43:21.547+0000] {taskinstance.py:441} INFO - ::group::Post task execution logs
+[2026-07-10T14:43:21.592+0000] {taskinstance.py:1206} INFO - Marking task as SUCCESS. dag_id=nyc_taxi_batch_etl, task_id=quality_check, run_id=scheduled__2026-07-09T03:00:00+00:00, execution_date=20260709T030000, start_date=20260710T144221, end_date=20260710T144321
+[2026-07-10T14:43:21.634+0000] {local_task_job_runner.py:243} INFO - Task exited with return code 0
+[2026-07-10T14:43:21.656+0000] {taskinstance.py:3503} INFO - 0 downstream tasks scheduled from follow-on schedule check
+[2026-07-10T14:43:21.658+0000] {local_task_job_runner.py:222} INFO - ::endgroup::
