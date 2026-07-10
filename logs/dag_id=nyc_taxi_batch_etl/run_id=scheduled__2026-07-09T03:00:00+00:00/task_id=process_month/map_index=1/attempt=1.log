@@ -15,3 +15,14 @@
 [2026-07-10T10:12:29.542+0000] {local_task_job_runner.py:243} INFO - Task exited with return code 0
 [2026-07-10T10:12:30.182+0000] {taskinstance.py:3503} INFO - 1 downstream tasks scheduled from follow-on schedule check
 [2026-07-10T10:12:30.186+0000] {local_task_job_runner.py:222} INFO - ::endgroup::
+[2026-07-10T11:56:08.210+0000] {local_task_job_runner.py:120} INFO - ::group::Pre task execution logs
+[2026-07-10T11:56:08.254+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=non-requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.process_month scheduled__2026-07-09T03:00:00+00:00 map_index=1 [queued]>
+[2026-07-10T11:56:08.266+0000] {taskinstance.py:2076} INFO - Dependencies all met for dep_context=requeueable deps ti=<TaskInstance: nyc_taxi_batch_etl.process_month scheduled__2026-07-09T03:00:00+00:00 map_index=1 [queued]>
+[2026-07-10T11:56:08.266+0000] {taskinstance.py:2306} INFO - Starting attempt 1 of 3
+[2026-07-10T11:56:08.283+0000] {taskinstance.py:2330} INFO - Executing <Mapped(_PythonDecoratedOperator): process_month> on 2026-07-09 03:00:00+00:00
+[2026-07-10T11:56:08.289+0000] {standard_task_runner.py:64} INFO - Started process 218 to run task
+[2026-07-10T11:56:08.293+0000] {standard_task_runner.py:90} INFO - Running: ['***', 'tasks', 'run', 'nyc_taxi_batch_etl', 'process_month', 'scheduled__2026-07-09T03:00:00+00:00', '--job-id', '13', '--raw', '--subdir', 'DAGS_FOLDER/taxi_etl_dag.py', '--cfg-path', '/tmp/tmp65iy3bme', '--map-index', '1']
+[2026-07-10T11:56:08.294+0000] {standard_task_runner.py:91} INFO - Job 13: Subtask process_month
+[2026-07-10T11:56:08.378+0000] {task_command.py:426} INFO - Running <TaskInstance: nyc_taxi_batch_etl.process_month scheduled__2026-07-09T03:00:00+00:00 map_index=1 [running]> on host 727d2fef0d7e
+[2026-07-10T11:56:08.504+0000] {taskinstance.py:2648} INFO - Exporting env vars: AIRFLOW_CTX_DAG_OWNER='data-engineering' AIRFLOW_CTX_DAG_ID='nyc_taxi_batch_etl' AIRFLOW_CTX_TASK_ID='process_month' AIRFLOW_CTX_EXECUTION_DATE='2026-07-09T03:00:00+00:00' AIRFLOW_CTX_TRY_NUMBER='1' AIRFLOW_CTX_DAG_RUN_ID='scheduled__2026-07-09T03:00:00+00:00'
+[2026-07-10T11:56:08.505+0000] {taskinstance.py:430} INFO - ::endgroup::
