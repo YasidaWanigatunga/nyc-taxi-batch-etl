@@ -4,6 +4,10 @@ Automated batch pipeline: downloads NYC TLC Yellow Taxi trip records,
 cleans them, loads a star schema into PostgreSQL, and serves business
 metrics through a Streamlit dashboard. Orchestrated with Apache Airflow.
 
+## Architecture
+
+![System Architecture](docs/system-architecture1.svg)
+
 ## Tech stack
 | Layer | Technology |
 |---|---|
